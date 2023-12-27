@@ -9,9 +9,15 @@
 #define N_POINTS 9 * 9 * 9
 
 bool is_running = false;
+int previous_frame_time = 0;
 
 vec3_t* vectors;
 vec2_t* projected_points;
+
+vec3_t camera_position = { 0.0, 0.0, -5.0 };
+vec3_t cube_rotation = { .x = 0.0, .y = 0.0, .z = 0.0 };
+
+int fov_factor = 640;
 
 uint32_t RED = 0xFFFF0000;
 uint32_t GREEN = 0xFF00FF00;
@@ -20,10 +26,14 @@ uint32_t YELLOW = 0xFFFFFF00;
 uint32_t WHITE = 0xFFFFFFFF;
 uint32_t BLACK = 0xFF000000;
 
+
+// NOTE:
+// calling draw_pixel(200.45...) is valid because it gets casted to an int. But its not 200.45, more like 400 something
+
 vec2_t project(vec3_t point) {
    vec2_t projected_point = {
-       .x = point.x,
-       .y = point.y
+       .x = (point.x * fov_factor) / point.z,
+       .y = (point.y * fov_factor) / point.z
    };
 
    return projected_point;
@@ -44,47 +54,45 @@ void process_input(void) {
             break;
     }
 }
+// tan (alpha) = opuesto / adyacente
+// 
 
 void update(void) {
+    // while (!SDL_TICKS_PASSED(SDL_GetTicks(), previous_frame_time + FRAME_TARGET_TIME));
+    int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - previous_frame_time);
+
+    if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
+        SDL_Delay(time_to_wait);
+    }
+
+    // total time in execution
+    previous_frame_time = SDL_GetTicks();
+
+    cube_rotation.x += 0.01;
+    cube_rotation.y += 0.01;
+    cube_rotation.z += 0.01;
+
     for (int i = 0; i < N_POINTS; i++) {
         vec3_t point = vectors[i];
-        vec2_t projected_point = project(point);
+
+        vec3_t transformed_point = vec3_rotate_x(point, cube_rotation.x);
+        transformed_point = vec3_rotate_y(transformed_point, cube_rotation.y);
+        transformed_point = vec3_rotate_z(transformed_point, cube_rotation.z);
+
+        transformed_point.z -= camera_position.z; 
+
+        vec2_t projected_point = project(transformed_point);
         projected_points[i] = projected_point;
     }
 }
-
-/*
- *
-void render(void* callback) {
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-
-    callback();
-    // -- calback --
-    draw_grid();
-    draw_rect(300, 200, 300, 150, 0xFFFF00FF);
-    // -- calback --
-
-    render_color_buffer();
-    clear_color_buffer(0xFF000000);
-
-    SDL_RenderPresent(renderer);
-}
- *
- *
- *
- *
- */
+ 
 
 void render(void) {
-
     draw_grid();
-    // draw_rect(300, 200, 300, 150, 0xFFFF00FF);
     for (int i = 0; i < N_POINTS; i++) {
         vec2_t projected_point = projected_points[i];
 
-        draw_rect(projected_point.x * 200 + (window_width / 2), projected_point.y * 200 + (window_height / 2), 4, 4, RED);
-        // draw_pixel(projected_point.x * 200 + 400, projected_point.y * 200 + 400, YELLOW);
+        draw_rect(projected_point.x + (window_width / 2), projected_point.y + (window_height / 2), 4, 4, RED);
     }
 
     render_color_buffer();
@@ -99,9 +107,13 @@ void init_vectors(float width, float height, float depth, int x_density, int y_d
     // width = 2
     // height = 2
     // depth = 2
-    float dx = width / 9.0; // 0.22222222
-    float dy = height / 9.0;
-    float dz = depth / 9.0;
+    // float dx = width / 9.0; // 0.22222222
+    // float dy = height / 9.0;
+    // float dz = depth / 9.0;
+    float dx = 0.25;
+    float dy = 0.25;
+    float dz = 0.25;
+
     float x_start = -1.0;
     float y_start = -1.0;
     float z_start = -1.0;
@@ -144,3 +156,26 @@ int main(void) {
 
     return 0;
 }
+
+/*
+ *
+void render(void* callback) {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    callback();
+    // -- calback --
+    draw_grid();
+    draw_rect(300, 200, 300, 150, 0xFFFF00FF);
+    // -- calback --
+
+    render_color_buffer();
+    clear_color_buffer(0xFF000000);
+
+    SDL_RenderPresent(renderer);
+}
+ *
+ *
+ *
+ *
+ */
